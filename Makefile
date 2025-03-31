@@ -1,12 +1,13 @@
 IMAGE_VERSION ?= latest
-# 确保 BUILDER_NAME 在解析阶段就确定值
 BUILDER_NAME ?= my-image-builder
-REGISTRY_URI ?= ""
 DOCKERFILE_NAME ?= Dockerfile
 IMAGE_NAME ?= ""
+PLATFORMS ?= linux/amd64,linux/arm64
+REGISTRY_ADDR ?= ghcr.io
+REGISTRY_USER ?= ""
 
 all: build-builder
-	@$(MAKE) build-image && $(MAKE) clean || ($(MAKE) clean)
+	@$(MAKE) build-image && $(MAKE) clean || ($(MAKE) clean && exit 1)
 
 .PHONY: all help build-builder build-image clean
 
@@ -20,21 +21,34 @@ help:
 	@echo
 
 build-builder:
-	docker buildx create --name ${BUILDER_NAME} --driver docker-container \
-		--use --bootstrap --platform linux/amd64,linux/arm64
+	@if docker buildx inspect ${BUILDER_NAME} >/dev/null 2>&1; then \
+		docker buildx use ${BUILDER_NAME} \
+		docker buildx inspect ${BUILDER_NAME} --bootstrap >/dev/null 2>&1 \
+		echo "Builder ${BUILDER_NAME} already exists"; \
+	else \
+		docker buildx create --name ${BUILDER_NAME} --driver docker-container \
+			--use --bootstrap --platform ${PLATFORMS}; \
+	fi
       
 build-image:
-	@if [ "${REGISTRY_URI}" = "" ] || [ "${IMAGE_NAME}" = "" ]; then \
-        echo "error: must set the image store registry use variable REGISTRY_URI and IMAGE_NAME"; \
+	@if [ -z "${REGISTRY_USER}" ] || [ -z "${IMAGE_NAME}" ]; then \
+        echo "error: must set the image store registry use variable REGISTRY_USER and IMAGE_NAME"; \
         exit 1; \
     fi
-	docker buildx build --builder ${BUILDER_NAME} \
+	docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --build-arg IMAGE_VERSION=${IMAGE_VERSION} \
-        --tag ${REGISTRY_URI}/${IMAGE_NAME}:${IMAGE_VERSION} \
+        --tag ${REGISTRY_ADDR}/${REGISTRY_USER}/${IMAGE_NAME}:${IMAGE_VERSION} \
         --file ${DOCKERFILE_NAME} \
         --push .
 
+registry-login:
+	docker login ${REGISTRY_ADDR}
+
 clean:
-	docker buildx stop ${BUILDER_NAME}
-	docker buildx rm ${BUILDER_NAME}
+	@if docker buildx inspect ${BUILDER_NAME} >/dev/null 2>&1; then \
+		docker buildx stop ${BUILDER_NAME}; \
+		docker buildx rm ${BUILDER_NAME}; \
+	else \
+		echo "Builder ${BUILDER_NAME} does not exist, skipping clean"; \
+	fi
