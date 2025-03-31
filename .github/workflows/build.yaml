@@ -29,6 +29,7 @@ on:
       REGISTRY_USER:
         description: 'Registry user'
         required: true
+        default: ''
 
 jobs:
   build-image:
@@ -63,5 +64,9 @@ jobs:
           IMAGE_NAME: ${{ github.event.inputs.IMAGE_NAME }}
           DOCKERFILE_NAME: ${{ github.event.inputs.DOCKERFILE_NAME }}
           PLATFORMS: ${{ github.event.inputs.PLATFORMS }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
+          if [ -z "$REGISTRY_USER" ]; then
+            REGISTRY_USER=$GITHUB_ACTOR
+          fi
           make build-image IMAGE_VERSION=$IMAGE_VERSION REGISTRY_ADDR=$REGISTRY_ADDR REGISTRY_USER=$REGISTRY_USER IMAGE_NAME=$IMAGE_NAME DOCKERFILE_NAME=$DOCKERFILE_NAME PLATFORMS=$PLATFORMS
