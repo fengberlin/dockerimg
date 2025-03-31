@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+ARG ALPINE_VERSION=latest
+FROM --platform=$BUILDPLATFORM alpine:${ALPINE_VERSION}
+
+ENV LANG=C.UTF-8
+
+# libc6-compat: glibc兼容层
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+    apk update && apk add --no-cache bash ca-certificates tzdata dumb-init libc6-compat && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo Asia/Shanghai > /etc/timezone && \
+    apk del tzdata && rm -rf /var/cache/apk/*
+
+# dns优先查找本地hosts
+# RUN echo "hosts: files dns" > /etc/nsswitch.conf
+
+# 利用--virtual参数，将多个包的集合命名为一个名称，方便了后续卸载
+# 使用git openssh-client 做一些操作,但镜像构建完成后不希望git保留在镜像中  
+# RUN apk add --no-cache --virtual=.build-dependencies git openssh-client && \
+#    apk del .build-dependencies
+
+ENV TZ=Asia/Shanghai
